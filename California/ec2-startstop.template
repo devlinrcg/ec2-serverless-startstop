@@ -1,0 +1,227 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description"              : "EC2 Instance Start/Stop on California Region",
+    "Parameters"               : {
+        "SNSTopicName" : {
+            "Type" : "String",
+            "Description" : "SNS Topic to Send Alerts to",
+            "Default"     : "sns-topic-name"
+        },
+        "S3BucketName" : {
+            "Type" : "String",
+            "Description" : "S3 Bucket Name (S3 Bucket where your Lambda Scripts are located)",
+            "Default"     : "s3-bucket-name"
+    }
+},
+    "Resources"                : {
+        "SNSTopicNameCreate" : {
+                "Type" : "AWS::SNS::Topic",
+                "Properties" : {
+                "TopicName" : {
+                        "Ref" : "SNSTopicName"
+                        }
+                }
+        },
+        "EC2StartStopCaliforniaRole" : {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "AssumeRolePolicyDocument" : {
+                    "Version" : "2012-10-17",
+                    "Statement" : [
+                        {
+                            "Effect" : "Allow",
+                            "Principal" : {
+                                "Service" : [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action"    : [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path"                     : "/"
+            }
+        },
+        "EC2StartStopCaliforniaPolicy" : {
+            "DependsOn" : [
+                "EC2StartStopCaliforniaRole"
+            ],
+            "Type"      : "AWS::IAM::Policy",
+            "Properties" : {
+                "PolicyName" : "ec2-startstop-California-role",
+                "Roles"      : [
+                    {
+                        "Ref" : "EC2StartStopCaliforniaRole"
+                    }
+                ],
+                "PolicyDocument" : {
+                    "Version" : "2012-10-17",
+                    "Statement" : [
+                        {
+                            "Effect" : "Allow",
+                            "Action" : [
+                                "logs:*"
+                            ],
+                            "Resource" : [
+                                "arn:aws:logs:*:*:*"
+                            ]
+                        },
+                        {
+                            "Effect" : "Allow",
+                            "Action" : [
+                              "ec2:DescribeInstanceAttribute",
+                              "ec2:DescribeInstanceStatus",
+                              "ec2:DescribeInstances",
+                              "ec2:StartInstances",
+                              "ec2:StopInstances"
+                            ],
+                            "Resource" : [
+                                "*"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "StartAllCaliforniaFunction" : {
+            "Type" : "AWS::Lambda::Function",
+            "DependsOn" : [
+                "EC2StartStopCaliforniaRole",
+                "EC2StartStopCaliforniaPolicy"
+            ],
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket" : {
+                        "Ref" : "S3BucketName"
+                    },
+                    "S3Key"    : "ec2-startstop.zip"
+                },
+                "Role" : {
+                    "Fn::GetAtt" : [
+                        "EC2StartStopCaliforniaRole",
+                        "Arn"
+                    ]
+                },
+                "Timeout" : 60,
+                "Handler" : "start_all.lambda_handler",
+                "Runtime" : "python2.7",
+                "MemorySize" : 128
+            }
+        },
+        "StartAllCaliforniaAlarm"           : {
+            "Type" : "AWS::CloudWatch::Alarm",
+            "Properties" : {
+                "AlarmName" : {
+                    "Fn::Join" : [
+                        "",
+                        [
+                            "Start All EC2 Instances on California Region",
+                            {
+                                "Ref" : "StartAllCaliforniaFunction"
+                            }
+                        ]
+                    ]
+                },
+                "AlarmDescription" : {
+                    "Fn::Join" : [
+                        "",
+                        [
+                            "Start All EC2 Instances is generating errors in California Region"
+                        ]
+                    ]
+                },
+                "MetricName"       : "Errors",
+                "Namespace"        : "AWS/Lambda",
+                "Statistic"        : "Sum",
+                "Threshold"        : "1",
+				"Period"           : "300",
+				"EvaluationPeriods": "1",
+                "AlarmActions"     : [
+			{
+                                "Ref" : "SNSTopicNameCreate"
+                	}
+			],
+                "Dimensions"       : [
+                    {
+                        "Name" : "FunctionName",
+                        "Value" : {
+                            "Ref" : "StartAllCaliforniaFunction"
+                        }
+                    }
+                ],
+                "ComparisonOperator" : "GreaterThanOrEqualToThreshold"
+            }
+        },
+        "StopAllCaliforniaFunction" : {
+            "Type" : "AWS::Lambda::Function",
+            "DependsOn" : [
+                "EC2StartStopCaliforniaRole",
+                "EC2StartStopCaliforniaPolicy"
+            ],
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket" : {
+                        "Ref" : "S3BucketName"
+                    },
+                    "S3Key"    : "ec2-startstop.zip"
+                },
+                "Role" : {
+                    "Fn::GetAtt" : [
+                        "EC2StartStopCaliforniaRole",
+                        "Arn"
+                    ]
+                },
+                "Timeout" : 60,
+                "Handler" : "stop_all.lambda_handler",
+                "Runtime" : "python2.7",
+                "MemorySize" : 128
+            }
+        },
+        "StopAllCaliforniaAlarm"           : {
+            "Type" : "AWS::CloudWatch::Alarm",
+            "Properties" : {
+                "AlarmName" : {
+                    "Fn::Join" : [
+                        "",
+                        [
+                            "Stop All EC2 Instances on California Region",
+                            {
+                                "Ref" : "StopAllCaliforniaFunction"
+                            }
+                        ]
+                    ]
+                },
+                "AlarmDescription" : {
+                    "Fn::Join" : [
+                        "",
+                        [
+                            "Stop All EC2 Instances in California Region is generating errors"
+                        ]
+                    ]
+                },
+                "MetricName"       : "Errors",
+                "Namespace"        : "AWS/Lambda",
+                "Statistic"        : "Sum",
+                "Threshold"        : "1",
+				"Period"           : "300",
+				"EvaluationPeriods": "1",
+                "AlarmActions"     : [
+			{
+                                "Ref" : "SNSTopicNameCreate"
+                	}
+			],
+                "Dimensions"       : [
+                    {
+                        "Name" : "FunctionName",
+                        "Value" : {
+                            "Ref" : "StopAllCaliforniaFunction"
+                        }
+                    }
+                ],
+                "ComparisonOperator" : "GreaterThanOrEqualToThreshold"
+            }
+        }
+    }
+}
