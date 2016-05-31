@@ -1,55 +1,58 @@
-# Stack AWS Cloudformation: Start/Stop de Instâncias Amazon EC2 via AWS Lambda
-###### Funcionamento
-* Cada diretório neste repositório representa **UMA** Região AWS. Assim, os templates podem ser lançados em **QUALQUER** Região que tenha o AWS Lambda disponível;
-* Cada diretório contém um template, 2 scripts (start_all.py e stop_all.py) e um script zip_all.sh;
-* Para cada edição feita nos scripts, você deve executar o zip_all.sh daquele diretório;
-* O template do AWS Cloudformation cria, automaticamente, a role e a policy para execução dos das funções no AWS Lambda;
+# Stack AWS Cloudformation: Start/Stop Amazon EC2 instances using AWS Lambda
+###### How it works
+* Each directory in this repository represents **ONE** AWS Region. This means that templates can be launched in **ANY** AWS Region with AWS Lambda available;
+    * As an example: if you have your Amazon EC2 instances on the SaoPaulo Region, you will have to launch the stack, let's say, on Virginia's Region (which will have the AWS Lambda availability), using the directory/template from SaoPaulo;
+* Each directory contains one template, 2 scripts (start_all.py an stop_all.py) and onw zip_all.sh script;
+* For every editing on start_all.py and/or stop_all.py, you have to execute the zip_all.sh on that directory;
+* The AWS Cloudformation creates, automatically, your role and policy so you can execute your functions on AWS Lambda;
 
-###### Uso
-* Acesse a console de sua conta AWS e vá até a console de gerenciamento do [Amazon S3](https://console.aws.amazon.com/s3/);
-* Crie um Bucket e clique para acessá-lo;
-* Faça o upload dos arquivos **ec2-startstop.template** e **ec2-startstop.zip** da Região de sua escolha para seu Bucket Amazon S3 criado no item anterior;
-* Clique no arquivo **ec2-startstop.template**, e clique em **Properties**;
-* Copie o link do arquivo, ex: https://s3.amazonaws.com/SEU_BUCKET/ec2-startstop.template
-* Agora, vá até a console de gerenciamento do [AWS Cloudformation](https://console.aws.amazon.com/cloudformation/);
-* Clique em **Create Stack**;
-* No campo **Specify an Amazon S3 template URL**, cole/insira o link que você copiou do template, e clique em next;
-* Preencha os campos necessários: em nome do Bucket Amazon S3, coloque o nome do Bucket criado nos passos anteriores. Em tópico SNS, insira um nome para o tópico do AWS Push Notification Service, que será utilizado para receber alertas em caso de erro na execução dos scripts;
-* Vá passando pelas opções até lançar o Stack;
-* Assim que lançado, os recursos serão criados automaticamente;
-* Após terminado o processo, vá até a console de gerenciamento do AWS SNS e se inscreva no tópico criado, para receber os alertas;
-* Repita estes passos para outras funções de Regiões diferentes;
-* Para agendamento da função no horário que quiser, após lançar os Stacks desejados, coloque um Event Source em cada Função AWS Lambda, conforme abaixo:
-* Acesse a console de gerenciamento do [AWS Lambda](https://console.aws.amazon.com/lambda);
-* Clique na função desejada;
-* Clique na aba **Event sources**;
-* Clique em **Add event source**;
-* Nesta tela, preencha:
-    * Event source type: **Cloudwatch Events - Schedule**;
-    * Rule name: um nome para a regra, que você possa lembrar;
-    * Rule description: uma descrição para regra;
-    * Schedule expression: siga os exemplos de  expressão abaixo.
-    * Clique em **Submit** e pronto, está agendado;
-    * Repita estes passos para as outras funções;
+###### Usage
+* Access your AWS account and go to [Amazon S3](https://console.aws.amazon.com/s3/);
+* Create a Bucket, and click on it;
+* Upload the **ec2-startstop.template** and **ec2-startstop.zip** from the direstory representing the AWS Region where you want to execute the Functions;
+* Click on the **ec2-startstop.template**, and then on **Properties**;
+* Copy the link presented to you, e.g. https://s3.amazonaws.com/SEU_BUCKET/ec2-startstop.template
+* Now, go to [AWS Cloudformation](https://console.aws.amazon.com/cloudformation/);
+* Click on **Create Stack**;
+    * In the field **Specify an Amazon S3 template URL**, insert the link for your template (copied before), and click next;
+    * Put the information needed: in **S3BucketName**, put the name of your Bucket, created earlier;
+    * In **SNSTopicName**, insert a name for an AWS Push Notification Service topic to be created, which will be used to alert you in case of any error/alert on the Function execution;
+    * Next, Next, Create;
+    * When launched, resources will be created automatically;
+    * After everything is created, go to the Management Console for AWS Push Notification Service and subscribe to the created topic, so you can receive alerts;
+* Repeat these steps for different AWS Regions;
+* To schedule these Functions to be executed at a time/date/rate of your choice, after launching the Stacks, insert an **Event Source** in each AWS Lambda Function, as informed below:
+    * Go to [AWS Lambda](https://console.aws.amazon.com/lambda);
+    * Click on the Function you want to schedule an event;
+    * Click on the **Event sources** tab;
+    * Click on **Add event source**;
+    * On this screen:
+      * Event source type: **Cloudwatch Events - Schedule**;
+      * Rule name: a name for your rule;
+      * Rule description: a description for your rule;
+      * Schedule expression: follow the expressions below;
+      * **Submit** and done;
+      * Repeat these steps for each Function;
 
-Assim que finalizar, insira a Tag **AutoStartStop**, com o valor **TRUE** nas instâncias Amazon EC2 que vão participar do Stop/Start. Caso a instância Amazon EC2 não tenham esta Tag, ou não tenha a Tag com o valor em **TRUE**, ela não entra na execução.
+###### Expressions - Schedule an Event
+Same as cron (Linux), following the UTC (+3BRT) timezone. Some examples:
 
-###### Exemplos de Expressões para agendamento
-As expressões são do cron (Linux), e seguem a hora UTC (+3BRT). Abaixo seguem alguns exemplos:
-
-* Executado às 17:00 (BRT) de segunda à sexta:
+* Executed at 17:00 (BRT) from monday until friday:
 ```
-cron(0 20 ? * MON-FRI * )
+      cron(0 20 ? * MON-FRI * )
 ```
-* Executado às 08:00 (BRT) de segunda à sexta:
+* Executed at 8:00 (BRT) from monday until friday:
 ```
-cron(0 11 ? * MON-FRI * )
+      cron(0 11 ? * MON-FRI * )
 ```  
 
-###### Funções
-**start_all.py**: Executa o START todas as Instâncias Amazon EC2 com a Tag Name AutoStartStop, e Valor TRUE (CASE-SENSITIVE);  
-**stop_all.py**: Executa o STOP todas as Instâncias Amazon EC2 com a Tag Name AutoStartStop, e Valor TRUE (CASE-SENSITIVE);
-###### Arquivos
+After you finish, insert the Tag **AutoStartStop**, with Value **TRUE** on the Amazon EC2 instances that will be part of the Stop/Start. In case any Amazon EC2 instance don't have this Tag, without the Value **TRUE**, it won't be in the Start/Stop execution.  
+**TAGS ARE CASE-SENSITIVE!!!**
+
+###### Functions
+**start_all.py**: Execute the START on all Amazon EC2 instances with Tag Name AutoStartStop, and Value TRUE (CASE-SENSITIVE);  
+**stop_all.py**: Execute the STOP on all Amazon EC2 instances with Tag Name AutoStartStop, and Value TRUE (CASE-SENSITIVE);
+###### Files
 ```
 ec2-serverless-startstop
 ├── California
